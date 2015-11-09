@@ -81,7 +81,7 @@ except ImportError:
     from distutils.core import setup
 
 setup(name='reddit-cssfilter',
-      version='1.1',
+      version='1.2',
       description='Parse and validate a safe subset of CSS',
       long_description=__doc__,
       author='reddit',
