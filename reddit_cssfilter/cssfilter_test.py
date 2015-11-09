@@ -32,6 +32,10 @@ class TestCSSFilter(unittest.TestCase):
         serialized, errors = validate_css(css, {})
         self.assertNotEqual(errors, [])
 
+    def assertValid(self, css):
+        serialized, errors = validate_css(css, {})
+        self.assertEqual(errors, [])
+
     def test_offsite_url(self):
         testcase = "*{background-image:url('http://foobar/')}"
         self.assertInvalid(testcase)
@@ -108,3 +112,14 @@ class TestCSSFilter(unittest.TestCase):
     def test_attr_url(self):
         testcase = "*{background-image:attr(foobar url);}"
         self.assertInvalid(testcase)
+
+    def test_valid_with_whitespace(self):
+        testcase = """
+        .site-title-text {
+            text-align: left;
+            display: block;
+            width: 157px;
+            margin: 0 auto;
+        }
+        """
+        self.assertValid(testcase)
