@@ -380,6 +380,9 @@ class ValidationError(object):
         self.message_params = message_params or {}
         # note: _source_lines is added to these objects by the parser
 
+    def get_message(self):
+        return self.message_key % self.message_params
+
     @property
     def offending_line(self):
         return self._source_lines[self.line - 1]
