@@ -475,8 +475,8 @@ class StylesheetValidator(object):
 
         return itertools.chain(prelude_errors, rule_errors)
 
-    def validate_rule_list(self, rules):
-        return validate_list(rules, {
+    def validate_rule_list(self, nodes):
+        return validate_list(nodes, {
             "qualified-rule": self.validate_qualified_rule,
             "at-rule": self.validate_at_rule,
         })
