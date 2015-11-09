@@ -64,6 +64,8 @@ SIMPLE_TOKEN_TYPES = set((
     "whitespace",
 ))
 
+SIMPLE_WHITESPACE = set(("whitespace",))
+
 VENDOR_PREFIXES = set((
     "-apple-",
     "-khtml-",
@@ -522,7 +524,7 @@ def check_for_evil_codepoints(source_lines):
                 break
 
 
-def validate_list(nodes, validators_by_type, ignored_types=None):
+def validate_list(nodes, validators_by_type, ignored_types=SIMPLE_WHITESPACE):
     for node in nodes:
         if node.type == "error":
             yield ValidationError(node.source_line, "SYNTAX_ERROR",
