@@ -35,13 +35,16 @@ Beyond that, every effort is made to allow the full gamut of modern CSS.
 import itertools
 import re
 import unicodedata
-
 import tinycss2
+
 
 def tup(item, ret_is_single=False):
     """Forces casting of item to a tuple (for a list) or generates a
-    single element tuple (for anything else)"""
-    #return true for iterables, except for strings, which is what we want
+    single element tuple (for anything else)
+    :param item:
+    :param ret_is_single:
+    """
+    # return true for iterables, except for strings, which is what we want
     if hasattr(item, '__iter__'):
         return (item, False) if ret_is_single else item
     else:
@@ -49,7 +52,6 @@ def tup(item, ret_is_single=False):
 
 
 __all__ = ["validate_css"]
-
 
 SIMPLE_TOKEN_TYPES = set((
     "dimension",
@@ -62,7 +64,6 @@ SIMPLE_TOKEN_TYPES = set((
     "whitespace",
 ))
 
-
 VENDOR_PREFIXES = set((
     "-apple-",
     "-khtml-",
@@ -72,7 +73,6 @@ VENDOR_PREFIXES = set((
     "-webkit-",
 ))
 assert all(prefix == prefix.lower() for prefix in VENDOR_PREFIXES)
-
 
 SAFE_PROPERTIES = set((
     "align-content",
@@ -295,8 +295,7 @@ SAFE_PROPERTIES = set((
     "word-spacing",
     "z-index",
 ))
-assert all(property == property.lower() for property in SAFE_PROPERTIES)
-
+assert all(safe_property == safe_property.lower() for safe_property in SAFE_PROPERTIES)
 
 SAFE_FUNCTIONS = set((
     "attr",
@@ -348,13 +347,12 @@ SAFE_FUNCTIONS = set((
 ))
 assert all(function == function.lower() for function in SAFE_FUNCTIONS)
 
-
 ERROR_MESSAGES = {
     "IMAGE_NOT_FOUND": 'no image found with name "%(name)s"',
     "NON_PLACEHOLDER_URL": "only uploaded images are allowed; reference "
-                              "them with the %%%%imagename%%%% system",
+                           "them with the %%%%imagename%%%% system",
     "SYNTAX_ERROR": "syntax error: %(message)s",
-    "UNKNOWN_AT_RULE":  "@%(keyword)s is not allowed",
+    "UNKNOWN_AT_RULE": "@%(keyword)s is not allowed",
     "UNKNOWN_PROPERTY": 'unknown property "%(name)s"',
     "UNKNOWN_FUNCTION": 'unknown function "%(function)s"',
     "UNEXPECTED_TOKEN": 'unexpected token "%(token)s"',
@@ -362,7 +360,6 @@ ERROR_MESSAGES = {
     "CONTROL_CHARACTER": "control characters are not allowed",
     "TOO_BIG": "the stylesheet is too big. maximum size: %(size)d KiB",
 }
-
 
 MAX_SIZE_KIB = 100
 SUBREDDIT_IMAGE_URL_PLACEHOLDER = re.compile(r"\A%%([a-zA-Z0-9\-]+)%%\Z")
@@ -377,6 +374,7 @@ def strip_vendor_prefix(identifier):
 
 class ValidationError(object):
     def __init__(self, line_number, error_code, message_params=None):
+        self._source_lines = tuple()
         self.line = line_number
         self.error_code = error_code
         self.message_params = message_params or {}
@@ -429,7 +427,7 @@ class StylesheetValidator(object):
         return self.validate_component_values(block.content)
 
     def validate_component_values(self, component_values):
-        return self.validate_list(component_values, {
+        return validate_list(component_values, {
             # {} blocks are technically part of component values but i don't
             # know of any actual valid uses for them in selectors etc. and they
             # can cause issues with e.g.
@@ -447,7 +445,7 @@ class StylesheetValidator(object):
         return self.validate_component_values(declaration.value)
 
     def validate_declaration_list(self, declarations):
-        return self.validate_list(declarations, {
+        return validate_list(declarations, {
             "at-rule": self.validate_at_rule,
             "declaration": self.validate_declaration,
         })
@@ -475,54 +473,10 @@ class StylesheetValidator(object):
         return itertools.chain(prelude_errors, rule_errors)
 
     def validate_rule_list(self, rules):
-        return self.validate_list(rules, {
+        return validate_list(rules, {
             "qualified-rule": self.validate_qualified_rule,
             "at-rule": self.validate_at_rule,
         })
-
-    def validate_list(self, nodes, validators_by_type, ignored_types=None):
-        for node in nodes:
-            if node.type == "error":
-                yield ValidationError(node.source_line, "SYNTAX_ERROR",
-                                      {"message": node.message})
-                continue
-            elif node.type == "literal":
-                if node.value == ";":
-                    # if we're seeing a semicolon as a literal, it's in a place
-                    # that doesn't fit naturally in the syntax.
-                    # Safari 5 will treat this as two color properties:
-                    # color: calc(;color:red;);
-                    message = "semicolons are not allowed in this context"
-                    yield ValidationError(node.source_line, "SYNTAX_ERROR",
-                                          {"message": message})
-                    continue
-
-            validator = validators_by_type.get(node.type)
-
-            if validator:
-                for error in tup(validator(node)):
-                    if error:
-                        yield error
-            else:
-                if not ignored_types or node.type not in ignored_types:
-                    yield ValidationError(node.source_line,
-                                          "UNEXPECTED_TOKEN",
-                                          {"token": node.type})
-
-    def check_for_evil_codepoints(self, source_lines):
-        for line_number, line_text in enumerate(source_lines, start=1):
-            for codepoint in line_text:
-                # IE<8: *{color: expression\28 alert\28 1 \29 \29 }
-                if codepoint == "\\":
-                    yield ValidationError(line_number, "BACKSLASH")
-                    break
-                # accept these characters that get classified as control
-                elif codepoint in ("\t", "\n", "\r"):
-                    continue
-                # Safari: *{font-family:'foobar\x03;background:url(evil);';}
-                elif unicodedata.category(codepoint).startswith("C"):
-                    yield ValidationError(line_number, "CONTROL_CHARACTER")
-                    break
 
     def parse_and_validate(self, stylesheet_source):
         if len(stylesheet_source) > (MAX_SIZE_KIB * 1024):
@@ -532,7 +486,7 @@ class StylesheetValidator(object):
 
         source_lines = stylesheet_source.splitlines()
 
-        backslash_errors = self.check_for_evil_codepoints(source_lines)
+        backslash_errors = check_for_evil_codepoints(source_lines)
         validation_errors = self.validate_rule_list(nodes)
 
         errors = []
@@ -549,6 +503,52 @@ class StylesheetValidator(object):
         return serialized.encode("utf-8"), errors
 
 
+def check_for_evil_codepoints(source_lines):
+    for line_number, line_text in enumerate(source_lines, start=1):
+        for codepoint in line_text:
+            # IE<8: *{color: expression\28 alert\28 1 \29 \29 }
+            if codepoint == "\\":
+                yield ValidationError(line_number, "BACKSLASH")
+                break
+            # accept these characters that get classified as control
+            elif codepoint in ("\t", "\n", "\r"):
+                continue
+            # Safari: *{font-family:'foobar\x03;background:url(evil);';}
+            elif unicodedata.category(codepoint).startswith("C"):
+                yield ValidationError(line_number, "CONTROL_CHARACTER")
+                break
+
+
+def validate_list(nodes, validators_by_type, ignored_types=None):
+    for node in nodes:
+        if node.type == "error":
+            yield ValidationError(node.source_line, "SYNTAX_ERROR",
+                                  {"message": node.message})
+            continue
+        elif node.type == "literal":
+            if node.value == ";":
+                # if we're seeing a semicolon as a literal, it's in a place
+                # that doesn't fit naturally in the syntax.
+                # Safari 5 will treat this as two color properties:
+                # color: calc(;color:red;);
+                message = "semicolons are not allowed in this context"
+                yield ValidationError(node.source_line, "SYNTAX_ERROR",
+                                      {"message": message})
+                continue
+
+        validator = validators_by_type.get(node.type)
+
+        if validator:
+            for error in tup(validator(node)):
+                if error:
+                    yield error
+        else:
+            if not ignored_types or node.type not in ignored_types:
+                yield ValidationError(node.source_line,
+                                      "UNEXPECTED_TOKEN",
+                                      {"token": node.type})
+
+
 def validate_css(stylesheet, images):
     """Validate and re-serialize the user submitted stylesheet.
 
@@ -559,6 +559,8 @@ def validate_css(stylesheet, images):
     The return value is a two-tuple of the re-serialized (and minified)
     stylesheet and a list of errors.  If the list is empty, the stylesheet is
     valid.
+    :param images:
+    :param stylesheet:
 
     """
     validator = StylesheetValidator(images)
