@@ -37,6 +37,13 @@ includes:
 
 Beyond that, every effort is made to allow the full gamut of modern CSS.
 
+Installation
+~~~~~~~~~~~~
+
+.. code-block:: bash
+
+	pip install reddit-cssfilter
+
 
 How to use
 ~~~~~~~~~~
